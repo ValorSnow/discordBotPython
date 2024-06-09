@@ -12,6 +12,8 @@ class Events(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message_delete(self, msg):
+        if msg.author.bot:
+            return
         channel = msg.channel
         content = msg.content
         embed = discord.Embed(colour=0xff0000,
