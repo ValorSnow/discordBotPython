@@ -9,7 +9,7 @@ import asyncio
 
 
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
-activity = discord.Game(name="With a tennis ball")
+activity = discord.Game(name="Playing with a tennis ball")
 client = commands.Bot(command_prefix='--', intents=discord.Intents.all(), activity=activity)
 
 
