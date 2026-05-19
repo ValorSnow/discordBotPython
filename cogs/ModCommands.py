@@ -1,6 +1,7 @@
 import discord
-from discord import Color
 from discord.ext import commands
+import os
+import asyncio
 
 
 class ModCommands(commands.Cog):
@@ -11,17 +12,29 @@ class ModCommands(commands.Cog):
     async def on_ready(self):
         print("ModCommands.py is ready")
 
-    @commands.command(alias='purge')
+    @commands.command(name='purge')
     @commands.has_permissions(manage_messages=True)
-    async def clear(self, ctx, amount: int):
-        if ctx.author.bot:
-            return
-        await ctx.channel.purge(limit=amount)
-        await ctx.send(f'{amount} message(s) successfully purged!')
+    async def clear(self, ctx, user: discord.User=None, amount: int=0):
+        try:
+            if ctx.author.bot:
+                return
+            if amount > 50 :
+                await ctx.send(embed=discord.Embed(colour=0xff0000, description="Purge limit of 50 messages."))
+                return
+            if user == None:
+                #The +1 is to include the original message in the full purge, I'm so sorry LMAO
+                await ctx.channel.purge(limit=amount+1)
+            else:
+                await ctx.message.delete()
+                await ctx.channel.purge(limit=amount, check=user)
+            await ctx.send(f'{amount} message(s) successfully purged!')
+        except Exception as e:
+            print(e)
+        
 
     @commands.command()
     @commands.has_permissions(kick_members=True)
-    async def kick(self, ctx, member: discord.Member, *, msg: str = 'No reason provided.'):
+    async def kick(self, ctx, member: discord.User, *, msg: str = 'No reason provided.'):
         if ctx.author.bot:
             return
         if member == ctx.author:
@@ -32,11 +45,11 @@ class ModCommands(commands.Cog):
             return
         await member.send(f'You have been **kicked** from `{ctx.guild.name}` for the following reason: `{msg}`')
         await member.kick(reason=msg)
-        await self.makeEmbed(0xff0000, ctx.author, member, "kicked", msg)
+        await self.make_embed(0xff0000, ctx.author, member, "kicked", msg)
 
     @commands.command()
     @commands.has_permissions(ban_members=True)
-    async def ban(self, ctx, user: discord.User = None, *, msg: str = 'No reason provided.'):
+    async def ban(self, ctx, user: discord.User, *, msg: str = 'No reason provided.'):
         if user is None:
             await ctx.channel.send('Please enter a user.')
         if ctx.author.bot:
@@ -51,15 +64,16 @@ class ModCommands(commands.Cog):
                 return
             await member.send(f'You have been **banned** from `{ctx.guild.name}` for the following reason: `{msg}`')
         await ctx.guild.ban(user=discord.Object(id=user.id), reason=msg)
-        await self.makeEmbed(0xff0000, ctx.author, user, "banned", msg)
+        await self.make_embed(0xff0000, ctx.author, user, "banned", msg)
 
     @commands.command()
     @commands.has_permissions(administrator=True)
-    async def multiban(self, ctx, users: commands.Greedy[discord.User] = None, *, msg='No reason given.'):
+    async def multiban(self, ctx, users: commands.Greedy[discord.User], *, msg='No reason provided.'):
         if ctx.author.bot:
             return
         if not users:
-            return await ctx.send('At least one member is required')
+            await ctx.send('At least one member is required')
+            return
         for user in users:
             if user == ctx.author:
                 await ctx.channel.send("You can't ban yourself dummy.")
@@ -72,17 +86,30 @@ class ModCommands(commands.Cog):
                 print('Yes')
                 await member.send(f'You have been **banned** from `{ctx.guild.name}` for the following reason: `{msg}`')
             await ctx.guild.ban(user=discord.Object(id=user.id), reason=msg)
-            await self.makeEmbed(0xff0000, ctx.author, user, "banned", msg)
+            await self.make_embed(0xff0000, ctx.author, user, "banned", msg)
 
-    @commands.command()
+    @commands.command(name='unban')
     @commands.has_permissions(ban_members=True)
-    async def unban(self, ctx, user: discord.User, *, msg="No reason given."):
+    async def remove_ban(self, ctx, user: discord.User, *, msg="No reason given."):
         if ctx.author.bot:
             return
         await ctx.guild.unban(user=discord.Object(id=user.id), reason=msg)
-        await self.makeEmbed(0xffff00, ctx.author, user, "unbanned", msg)
+        await self.make_embed(0xffff00, ctx.author, user, "unbanned", msg)
 
-    async def makeEmbed(self, colour, author, member, ptype, reason):
+    @commands.command()
+    @commands.is_owner()
+    async def reload(self, ctx):
+        for ext in os.listdir("./cogs/"):
+            if ext.endswith(".py") and not ext.startswith("_"):
+                try:
+                    self.client.unload_extension(f"cogs.{ext[:-3]}")
+                    await asyncio.sleep(0.5)
+                    self.client.load_extension(f"cogs.{ext[:-3]}")
+                except Exception as e:
+                    print(e)
+        await ctx.send('Bot reloaded')
+
+    async def make_embed(self, colour, author, member, ptype, reason):
         embed = discord.Embed(
             color=colour,
             title=f"User {ptype}",
